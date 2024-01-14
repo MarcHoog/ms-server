@@ -5,101 +5,57 @@ import (
 
 	"github.com/MarcHoog/ms-server/common/constant"
 	"github.com/MarcHoog/ms-server/mnet/crypt"
-	"github.com/MarcHoog/ms-server/mpacket"
 )
 
-type Client interface {
-	MapleConn
-
-	GetLogedIn() bool
-	SetLogedIn(bool)
-	GetAccountID() int32
-	SetAccountID(int32)
-	GetGender() byte
-	SetGender(byte)
-	GetWorldID() byte
-	SetWorldID(byte)
-	GetChannelID() byte
-	SetChannelID(byte)
-	GetAdminLevel() int
-	SetAdminLevel(int)
-}
-
-type client struct {
+type clientConn struct {
 	baseConn
-
-	logedIn    bool
-	accountID  int32
-	gender     byte
-	worldID    byte
-	channelID  byte
-	adminLevel int
 }
 
-func NewClient(conn net.Conn, eRecv chan *Event, queueSize int, keySend, keyRecv [4]byte, latency, jitter int) *client {
-	c := &client{}
-	c.Conn = conn
+func NewClientConn(Conn net.Conn, eRecv chan *Event, queueSize int, keySend, keyRecv [4]byte) *clientConn {
+	c := &clientConn{}
+	c.Conn = Conn
 
-	c.eventSend = make(chan mpacket.Packet, queueSize)
 	c.eventRecv = eRecv
 
 	c.cryptSend = crypt.New(keySend, constant.MapleVersion)
 	c.cryptRecv = crypt.New(keyRecv, constant.MapleVersion)
 
-	c.reader = func() {
-		clientReader(c, c.eventRecv, constant.MapleVersion, constant.ClientHeaderSize, c.cryptRecv)
+	c.Reader = func() {
+		Reader(Conn, c.eventRecv, constant.MapleVersion, constant.ClientHeaderSize, c.cryptRecv)
 	}
 
-	c.interServer = false
-	c.latency = latency
-	c.pSend = make(chan func(), queueSize*10) // Used only when simulating latency
 	return c
 }
 
-func (c *client) GetLogedIn() bool {
-	return c.logedIn
-}
+func Reader(Conn net.Conn, eventRecv chan *Event, mapleVersion int16, headerSize int, cryptRecv *crypt.Crypt) {
 
-func (c *client) SetLogedIn(logedIn bool) {
-	c.logedIn = logedIn
-}
+	// When the reader is started it sends an event that a client has connected Succesfully
+	eventRecv <- &Event{Type: MapleEventClientConnected, Conn: Conn}
 
-func (c *client) GetAccountID() int32 {
-	return c.accountID
-}
+	header := true
+	readSize := headerSize
 
-func (c *client) SetAccountID(accountID int32) {
-	c.accountID = accountID
-}
+	for {
+		buffer := make([]byte, readSize)
 
-func (c *client) GetGender() byte {
-	return c.gender
-}
+		// Fill the buffer until it's full little bad bo
+		if _, err := Conn.Read(buffer); err != nil {
+			eventRecv <- &Event{Type: MapleEventClientDisconnect, Conn: Conn}
+			break
+		}
 
-func (c *client) SetGender(gender byte) {
-	c.gender = gender
-}
+		if header {
+			readSize = crypt.GetPacketLength(buffer)
+		} else {
+			readSize = headerSize
 
-func (c *client) GetWorldID() byte {
-	return c.worldID
-}
+			if cryptRecv != nil {
+				cryptRecv.Decrypt(buffer, true, false)
+			}
 
-func (c *client) SetWorldID(id byte) {
-	c.worldID = id
-}
+			eventRecv <- &Event{Type: MapleEventClientPacket, Conn: Conn, Packet: buffer}
+		}
 
-func (c *client) GetChannelID() byte {
-	return c.channelID
-}
-
-func (c *client) SetChannelID(id byte) {
-	c.channelID = id
-}
-
-func (c *client) GetAdminLevel() int {
-	return c.adminLevel
-}
-
-func (c *client) SetAdminLevel(level int) {
-	c.adminLevel = level
+		header = !header
+	}
 }
