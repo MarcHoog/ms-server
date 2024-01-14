@@ -20,7 +20,7 @@ func NewClientConn(Conn net.Conn, eRecv chan *Event, queueSize int, keySend, key
 	c.cryptSend = crypt.New(keySend, constant.MapleVersion)
 	c.cryptRecv = crypt.New(keyRecv, constant.MapleVersion)
 
-	c.Reader = func() {
+	c.reader = func() {
 		Reader(Conn, c.eventRecv, constant.MapleVersion, constant.ClientHeaderSize, c.cryptRecv)
 	}
 
