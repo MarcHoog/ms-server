@@ -16,5 +16,5 @@ const (
 type Event struct {
 	Type     int
 	Packet   mpacket.Packet
-	ToClient chan *mpacket.Packet
+	ToClient chan mpacket.Packet
 }

@@ -23,7 +23,7 @@ func NewClientConn(conn net.Conn, toMainThread chan *Event, queueSize int, fromC
 	cc := &clientConn{}
 	cc.Conn = conn
 
-	cc.toClient = make(chan *mpacket.Packet, queueSize)
+	cc.toClient = make(chan mpacket.Packet, queueSize)
 	cc.toMainThread = toMainThread
 
 	cc.fromClientCrypt = crypt.NewCrypt(fromClientKey)

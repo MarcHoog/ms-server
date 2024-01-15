@@ -43,9 +43,9 @@ func (ls *loginServer) run() {
 
 	//	ls.gameState.Initialise(ls.dbConfig.User, ls.dbConfig.Password, ls.dbConfig.Address, ls.dbConfig.Port, ls.dbConfig.Database, ls.config.WithPin)
 
-	ls.wg.Add(1)
+	ls.wg.Add(2)
 	go ls.acceptNewClientConnections()
-	// go ls.processEvent()
+	go ls.processEvent()
 
 	ls.wg.Wait()
 }
@@ -86,6 +86,7 @@ func (ls *loginServer) acceptNewClientConnections() {
 		client := mnet.NewClientConn(Conn, ls.toMainThread, 512, fromClientKey, toClientKey)
 
 		go client.Reader()
+		go client.Writer()
 
 		log.Println("Creating handshake packet")
 		handshakePacket := mnet.NewClientHandshakePacket(28, fromClientKey[:], toClientKey[:])
@@ -107,6 +108,8 @@ func (ls *loginServer) processEvent() {
 		}
 
 		reader := mpacket.NewReader(&e.Packet, time.Now().Unix())
+
+		log.Println("Processsing new Package: ", reader)
 
 		switch e.Type {
 		case mnet.MapleEventClientConnected:

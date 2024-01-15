@@ -3,6 +3,7 @@ package mnet
 import (
 	"log"
 	"net"
+	"time"
 
 	"github.com/MarcHoog/elesia/mnet/crypt"
 	"github.com/MarcHoog/elesia/mpacket"
@@ -12,7 +13,7 @@ type baseConnection struct {
 	net.Conn
 
 	toMainThread chan *Event
-	toClient     chan *mpacket.Packet
+	toClient     chan mpacket.Packet
 
 	fromClientCrypt *crypt.Crypt
 	toClientCrypt   *crypt.Crypt
@@ -29,6 +30,15 @@ func (bc *baseConnection) Cleanup() {
 	close(bc.toClient)
 }
 
+func (bc *baseConnection) Send(p mpacket.Packet) {
+	if !bc.active {
+		return
+	}
+
+	bc.toClient <- p
+
+}
+
 func (bc *baseConnection) Writer() {
 
 	for {
@@ -39,15 +49,16 @@ func (bc *baseConnection) Writer() {
 			return
 		}
 
+		reader := mpacket.NewReader(&p, time.Now().Unix())
+		log.Println("sending Package: ", reader)
+
 		if bc.toClientCrypt != nil {
 			const maple = true
 			const aes = false
-			bc.toClientCrypt.Encrypt(*p, maple, aes)
+			bc.toClientCrypt.Encrypt(p, maple, aes)
 		}
 
-		if _, err := bc.Conn.Write(*p); err != nil {
-			log.Println("Something went wrong with writing to over Connection:", err)
-			return
-		}
+		bc.Conn.Write(p)
+
 	}
 }

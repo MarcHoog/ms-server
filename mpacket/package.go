@@ -9,8 +9,13 @@ import (
 type Packet []byte
 type Opcode byte
 
-// TODO(Marc) Notes why we keep adding to poss if we are not reusing the value
-// A bit weird
+func CreateWithOpcode(op byte) Packet {
+	p := Packet{}
+	p.WriteInt32(0)
+	p.WriteByte(op)
+
+	return p
+}
 
 // Defining
 
