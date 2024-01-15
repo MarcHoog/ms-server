@@ -1,6 +1,7 @@
 package mnet
 
 import (
+	"log"
 	"net"
 
 	"github.com/MarcHoog/ms-server/common/constant"
@@ -12,6 +13,7 @@ type clientConn struct {
 }
 
 func NewClientConn(Conn net.Conn, eRecv chan *Event, queueSize int, keySend, keyRecv [4]byte) *clientConn {
+	log.Println("Creatig new client connection for a new client")
 	c := &clientConn{}
 	c.Conn = Conn
 
@@ -20,7 +22,8 @@ func NewClientConn(Conn net.Conn, eRecv chan *Event, queueSize int, keySend, key
 	c.cryptSend = crypt.New(keySend, constant.MapleVersion)
 	c.cryptRecv = crypt.New(keyRecv, constant.MapleVersion)
 
-	c.reader = func() {
+	log.Println("Assigning function to c.reader")
+	c.Reader = func() {
 		Reader(Conn, c.eventRecv, constant.MapleVersion, constant.ClientHeaderSize, c.cryptRecv)
 	}
 
@@ -28,14 +31,16 @@ func NewClientConn(Conn net.Conn, eRecv chan *Event, queueSize int, keySend, key
 }
 
 func Reader(Conn net.Conn, eventRecv chan *Event, mapleVersion int16, headerSize int, cryptRecv *crypt.Crypt) {
-
+	log.Println("initializing reader")
 	// When the reader is started it sends an event that a client has connected Succesfully
-	eventRecv <- &Event{Type: MapleEventClientConnected, Conn: Conn}
+	//eventRecv <- &Event{Type: MapleEventClientConnected, Conn: Conn}
 
+	log.Println("after sending something to eventRecv")
 	header := true
 	readSize := headerSize
 
 	for {
+		log.Println()
 		buffer := make([]byte, readSize)
 
 		// Fill the buffer until it's full little bad bo
@@ -43,7 +48,7 @@ func Reader(Conn net.Conn, eventRecv chan *Event, mapleVersion int16, headerSize
 			eventRecv <- &Event{Type: MapleEventClientDisconnect, Conn: Conn}
 			break
 		}
-
+		log.Println("Plz move...")
 		if header {
 			readSize = crypt.GetPacketLength(buffer)
 		} else {

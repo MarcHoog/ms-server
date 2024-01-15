@@ -57,7 +57,7 @@ func (ls *loginServer) run() {
 
 	//	ls.gameState.Initialise(ls.dbConfig.User, ls.dbConfig.Password, ls.dbConfig.Address, ls.dbConfig.Port, ls.dbConfig.Database, ls.config.WithPin)
 
-	ls.wg.Add(2)
+	ls.wg.Add(1)
 	go ls.acceptNewClientConnections()
 	//go ls.processEvent()
 

@@ -19,15 +19,11 @@ type baseConn struct {
 	net.Conn
 	eventSend chan mpacket.Packet
 	eventRecv chan *Event
-	reader    func()
+	Reader    func()
 	closed    bool
 
 	cryptSend *crypt.Crypt
 	cryptRecv *crypt.Crypt
-}
-
-func (bc *baseConn) Reader() {
-	bc.reader()
 }
 
 func (bc *baseConn) Send(p mpacket.Packet) {
