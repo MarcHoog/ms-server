@@ -1,66 +1,72 @@
 package mnet
 
 import (
-	"log"
 	"net"
 
-	"github.com/MarcHoog/ms-server/common/constant"
-	"github.com/MarcHoog/ms-server/mnet/crypt"
+	"github.com/MarcHoog/elesia/mnet/crypt"
+	"github.com/MarcHoog/elesia/mpacket"
 )
 
 type clientConn struct {
-	baseConn
+	baseConnection
+
+	headerSize int32
+
+	loggedIn  bool
+	accountID int32
+	worldID   byte
+	channelID byte
 }
 
-func NewClientConn(Conn net.Conn, eRecv chan *Event, queueSize int, keySend, keyRecv [4]byte) *clientConn {
-	log.Println("Creatig new client connection for a new client")
-	c := &clientConn{}
-	c.Conn = Conn
+func NewClientConn(conn net.Conn, toMainThread chan *Event, queueSize int, fromClientKey, toClientKey [4]byte) *clientConn {
 
-	c.eventRecv = eRecv
+	cc := &clientConn{}
+	cc.Conn = conn
 
-	c.cryptSend = crypt.New(keySend, constant.MapleVersion)
-	c.cryptRecv = crypt.New(keyRecv, constant.MapleVersion)
+	cc.toClient = make(chan *mpacket.Packet, queueSize)
+	cc.toMainThread = toMainThread
 
-	log.Println("Assigning function to c.reader")
-	c.Reader = func() {
-		Reader(Conn, c.eventRecv, constant.MapleVersion, constant.ClientHeaderSize, c.cryptRecv)
-	}
+	cc.fromClientCrypt = crypt.NewCrypt(fromClientKey)
+	cc.toClientCrypt = crypt.NewCrypt(toClientKey)
 
-	return c
+	cc.headerSize = 4
+	cc.active = true
+
+	return cc
+
 }
 
-func Reader(Conn net.Conn, eventRecv chan *Event, mapleVersion int16, headerSize int, cryptRecv *crypt.Crypt) {
-	log.Println("initializing reader")
-	// When the reader is started it sends an event that a client has connected Succesfully
-	//eventRecv <- &Event{Type: MapleEventClientConnected, Conn: Conn}
+func (cc *clientConn) Reader() {
+	cc.toMainThread <- &Event{MapleEventClientConnected, nil, cc.toClient}
 
-	log.Println("after sending something to eventRecv")
 	header := true
-	readSize := headerSize
+	readSize := cc.headerSize
 
 	for {
-		log.Println()
-		buffer := make([]byte, readSize)
 
-		// Fill the buffer until it's full little bad bo
-		if _, err := Conn.Read(buffer); err != nil {
-			eventRecv <- &Event{Type: MapleEventClientDisconnect, Conn: Conn}
-			break
+		packet := mpacket.NewPacket(readSize)
+
+		if _, err := cc.Conn.Read(packet); err != nil {
+			cc.toMainThread <- &Event{MapleEventClientDisconnect, nil, cc.toClient}
+			return
 		}
-		log.Println("Plz move...")
-		if header {
-			readSize = crypt.GetPacketLength(buffer)
-		} else {
-			readSize = headerSize
 
-			if cryptRecv != nil {
-				cryptRecv.Decrypt(buffer, true, false)
+		if header {
+			readSize = int32(crypt.GetPacketLength(packet))
+		} else {
+			readSize = cc.headerSize
+
+			if cc.fromClientCrypt != nil {
+				// our client does have AES turned on
+				cc.fromClientCrypt.Decrypt(packet, true, false)
 			}
 
-			eventRecv <- &Event{Type: MapleEventClientPacket, Conn: Conn, Packet: buffer}
+			cc.toMainThread <- &Event{MapleEventClientPacket, packet, cc.toClient}
+
 		}
 
 		header = !header
+
 	}
+
 }

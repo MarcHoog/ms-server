@@ -15,14 +15,14 @@ type Crypt struct {
 	key          [16]byte
 }
 
-func New(key [4]byte, mapleVersion int) *Crypt {
+func NewCrypt(key [4]byte) *Crypt {
 	var c Crypt
 
 	for i := 0; i < 4; i++ {
 		copy(c.key[4*i:], key[:])
 	}
 
-	c.mapleVersion = mapleVersion
+	c.mapleVersion = 28
 
 	return &c
 }

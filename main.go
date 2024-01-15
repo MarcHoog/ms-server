@@ -6,40 +6,26 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
-	"github.com/MarcHoog/ms-server/common/constant"
-	"github.com/MarcHoog/ms-server/mpacket"
-
-	"github.com/MarcHoog/ms-server/mnet"
+	"github.com/MarcHoog/elesia/login"
+	"github.com/MarcHoog/elesia/mnet"
+	"github.com/MarcHoog/elesia/mpacket"
 )
 
 type loginServer struct {
 	// config    loginConfig
 	// dbConfig  dbConfig
-	eventRecv chan *mnet.Event
-	wg        *sync.WaitGroup
-	// gameState login.Server
-}
-
-func NewClientHandshakePacket(mapleVersion int16, keyRecv, KeySend []byte) mpacket.Packet {
-	p := mpacket.NewPacket()
-
-	p.WriteInt16(13)
-	p.WriteInt16(mapleVersion)
-	p.WriteString("")
-	p.Append(keyRecv)
-	p.Append(KeySend)
-	p.WriteByte(8)
-
-	return p
-
+	toMainThread chan *mnet.Event
+	wg           *sync.WaitGroup
+	mt           login.MainThread
 }
 
 func newLoginServer() *loginServer {
 	//	config, dbConfig := loginConfigFromFile(configFile)
 
 	return &loginServer{
-		eventRecv: make(chan *mnet.Event),
+		toMainThread: make(chan *mnet.Event),
 		//		config:   config,
 		//		dbConfig: dbConfig,
 		wg: &sync.WaitGroup{},
@@ -59,7 +45,7 @@ func (ls *loginServer) run() {
 
 	ls.wg.Add(1)
 	go ls.acceptNewClientConnections()
-	//go ls.processEvent()
+	// go ls.processEvent()
 
 	ls.wg.Wait()
 }
@@ -76,16 +62,14 @@ func (ls *loginServer) acceptNewClientConnections() {
 
 	log.Println("Client listener ready:", "0.0.0.0"+":"+"8484")
 
-	// GO lang for?  nog even uitzoeken
 	for {
 
-		// Wacht op een client die probeert te connecten en accepteert deze
 		Conn, err := listener.Accept()
 		log.Println("Client attempting to to connect")
 
 		if err != nil {
 			log.Println("Error in accepting client", err)
-			close(ls.eventRecv)
+			close(ls.toMainThread)
 			return
 		}
 
@@ -94,55 +78,48 @@ func (ls *loginServer) acceptNewClientConnections() {
 		// ls.gameState.ClientConnected(conn, ls.eRecv, ls.config.PacketQueueSize)
 
 		log.Println("Creating 2, 4 Byte long encryption keys")
-		keyRecv := [4]byte{}
-		rand.Read(keyRecv[:])
-		keySend := [4]byte{}
-		rand.Read(keySend[:])
+		fromClientKey := [4]byte{}
+		rand.Read(fromClientKey[:])
+		toClientKey := [4]byte{}
+		rand.Read(toClientKey[:])
 
-		client := mnet.NewClientConn(Conn, ls.eventRecv, 512, keySend, keyRecv)
+		client := mnet.NewClientConn(Conn, ls.toMainThread, 512, fromClientKey, toClientKey)
 
 		go client.Reader()
 
 		log.Println("Creating handshake packet")
-		handshakePacket := NewClientHandshakePacket(constant.MapleVersion, keyRecv[:], keySend[:])
+		handshakePacket := mnet.NewClientHandshakePacket(28, fromClientKey[:], toClientKey[:])
 
 		log.Println("Sending handshake packet naar de client over de connection")
 		Conn.Write(handshakePacket)
 	}
 }
 
-func main() {
-	s := newLoginServer()
-	s.run()
-
-}
-
-/*
 func (ls *loginServer) processEvent() {
 	defer ls.wg.Done()
 
 	for {
-		select {
-		case e, ok := <-ls.eventRecv:
+		e, ok := <-ls.toMainThread
 
-			if !ok {
-				log.Println("Stopping event handling due to channel read error")
-				return
-			}
+		if !ok {
+			log.Println("Something went wrong with reading from toMainThread channel")
+			return
+		}
 
-			switch conn := e.Conn.(type) {
-			case mnet.Client:
-				switch e.Type {
-				case mnet.MapleEventClientConnected:
-					log.Println("New client from", conn)
-				case mnet.MClientDisconnect:
-					log.Println("Client at", conn, "disconnected")
-					ls.gameState.ClientDisconnected(conn)
-				case mnet.MEClientPacket:
-					ls.gameState.HandleClientPacket(conn, mpacket.NewReader(&e.Packet, time.Now().Unix()))
-				}
-			}
+		reader := mpacket.NewReader(&e.Packet, time.Now().Unix())
+
+		switch e.Type {
+		case mnet.MapleEventClientConnected:
+			log.Println("Client connected")
+		case mnet.MapleEventClientDisconnect:
+			log.Println("Client disconnected")
+		case mnet.MapleEventClientPacket:
+			ls.mt.HandleClientEvents(reader, e.ToClient)
 		}
 	}
 }
-*/
+
+func main() {
+	s := newLoginServer()
+	s.run()
+}

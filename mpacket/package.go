@@ -14,8 +14,8 @@ type Opcode byte
 
 // Defining
 
-func NewPacket() Packet {
-	return make(Packet, 0)
+func NewPacket(size int32) Packet {
+	return make(Packet, size)
 }
 
 func (p *Packet) Append(data []byte) {
