@@ -12,7 +12,7 @@ type baseConnection struct {
 	net.Conn
 
 	toMainThread chan *Event
-	toClient     chan mpacket.Packet
+	toClient     chan *mpacket.Packet
 
 	fromClientCrypt *crypt.Crypt
 	toClientCrypt   *crypt.Crypt
@@ -42,10 +42,10 @@ func (bc *baseConnection) Writer() {
 		if bc.toClientCrypt != nil {
 			const maple = true
 			const aes = false
-			bc.toClientCrypt.Encrypt(p, maple, aes)
+			bc.toClientCrypt.Encrypt(*p, maple, aes)
 		}
 
-		if _, err := bc.Conn.Write(p); err != nil {
+		if _, err := bc.Conn.Write(*p); err != nil {
 			log.Println("Something went wrong with writing to over Connection:", err)
 			return
 		}

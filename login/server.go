@@ -22,5 +22,5 @@ func (mt *MainThread) HandleClientEvents(reader mpacket.Reader, toClient chan<- 
 }
 
 func (mt *MainThread) handleLoginRequest(reader mpacket.Reader, toClient chan<- *mpacket.Packet) {
-
+	log.prinln("handleLoginRequest")
 }
