@@ -109,15 +109,16 @@ func (ls *loginServer) processEvent() {
 
 		reader := mpacket.NewReader(&e.Packet, time.Now().Unix())
 
-		log.Println("Processsing new Package: ", reader)
-
-		switch e.Type {
-		case mnet.MapleEventClientConnected:
-			log.Println("Client connected")
-		case mnet.MapleEventClientDisconnect:
-			log.Println("Client disconnected")
-		case mnet.MapleEventClientPacket:
-			ls.mt.HandleClientEvents(reader, e.ToClient)
+		switch conn := e.Conn.(type) {
+		case mnet.MapleClient:
+			switch e.Type {
+			case mnet.MapleEventClientConnected:
+				log.Println("Client connected")
+			case mnet.MapleEventClientDisconnect:
+				log.Println("Client disconnected")
+			case mnet.MapleEventClientPacket:
+				ls.mt.HandleClientEvents(reader, conn)
+			}
 		}
 	}
 }

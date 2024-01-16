@@ -9,6 +9,12 @@ import (
 	"github.com/MarcHoog/elesia/mpacket"
 )
 
+type MapleConn interface {
+	String() string
+	Send(mpacket.Packet)
+	Cleanup()
+}
+
 type baseConnection struct {
 	net.Conn
 

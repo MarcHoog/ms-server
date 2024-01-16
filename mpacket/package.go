@@ -94,7 +94,7 @@ func (p *Packet) Size() int {
 }
 
 func (p Packet) String() string {
-	return fmt.Sprintf("[Packet] (%d) : % X", len(p), string(p))
+	return fmt.Sprintf("[Packet] Len(%d) | % X", len(p), string(p))
 
 }
 

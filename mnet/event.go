@@ -14,7 +14,7 @@ const (
 )
 
 type Event struct {
-	Type     int
-	Packet   mpacket.Packet
-	ToClient chan mpacket.Packet
+	Type   int
+	Packet mpacket.Packet
+	Conn   MapleConn
 }

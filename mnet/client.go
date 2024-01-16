@@ -7,6 +7,12 @@ import (
 	"github.com/MarcHoog/elesia/mpacket"
 )
 
+type MapleClient interface {
+	MapleConn
+
+	SetLoggedIn(bool) *clientConn
+}
+
 type clientConn struct {
 	baseConnection
 
@@ -36,8 +42,13 @@ func NewClientConn(conn net.Conn, toMainThread chan *Event, queueSize int, fromC
 
 }
 
+func (cc *clientConn) SetLoggedIn(loggedIn bool) *clientConn {
+	cc.loggedIn = loggedIn
+	return cc
+}
+
 func (cc *clientConn) Reader() {
-	cc.toMainThread <- &Event{MapleEventClientConnected, nil, cc.toClient}
+	cc.toMainThread <- &Event{MapleEventClientConnected, nil, cc}
 
 	header := true
 	readSize := cc.headerSize
@@ -47,7 +58,7 @@ func (cc *clientConn) Reader() {
 		packet := mpacket.NewPacket(readSize)
 
 		if _, err := cc.Conn.Read(packet); err != nil {
-			cc.toMainThread <- &Event{MapleEventClientDisconnect, nil, cc.toClient}
+			cc.toMainThread <- &Event{MapleEventClientDisconnect, nil, cc}
 			return
 		}
 
@@ -61,7 +72,7 @@ func (cc *clientConn) Reader() {
 				cc.fromClientCrypt.Decrypt(packet, true, false)
 			}
 
-			cc.toMainThread <- &Event{MapleEventClientPacket, packet, cc.toClient}
+			cc.toMainThread <- &Event{MapleEventClientPacket, packet, cc}
 
 		}
 
